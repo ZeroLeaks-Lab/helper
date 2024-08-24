@@ -1,0 +1,18 @@
+[Websocket]
+addr = ":443"
+
+# Origins allowed to use the websocket server.
+# If empty or not set, requests from ANY origins are accepted.
+origins = [
+  "zeroleaks.org",
+]
+
+[Websocket.TLS]
+cert = "zeroleaks.crt"
+key = "zeroleaks.key"
+
+[DNS]
+addr = ":53"
+
+# Domain under which to create temporary subdomains.
+domain = "dns.zeroleaks.org"
