@@ -68,5 +68,11 @@ func startWebsocketServer(addr string, tls TLSConfig, options websocket.AcceptOp
 		}
 		dnsLeakTest(ws)
 	})
-	log.Fatalln(LOG_TAG, "failed to start:", http.ListenAndServeTLS(addr, tls.Cert, tls.Key, nil))
+	var err error
+	if conf.Websocket.TLS.Cert == "" && conf.Websocket.TLS.Key == "" {
+		err = http.ListenAndServe(addr, nil)
+	} else {
+		err = http.ListenAndServeTLS(addr, tls.Cert, tls.Key, nil)
+	}
+	log.Fatalln(LOG_TAG, "failed to start:", err)
 }
