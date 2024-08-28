@@ -33,14 +33,19 @@ func dnsLeakTest(ws *websocket.Conn) {
 		Base:       conf.DNS.Domain,
 		Subdomains: make([]string, 0, TESTS_NUMBER),
 	}
+	ipSet := make(map[string]struct{})
 	closed := false
 	for i := 0; i < TESTS_NUMBER; i++ {
 		s := binary.LittleEndian.Uint32(random[i : i+4])
 		params.Subdomains = append(params.Subdomains, strconv.FormatUint(uint64(s), 10))
 		registerDnsCallback(s, func(ip net.IP) {
 			if !closed {
-				if err := ws.Write(ctx, websocket.MessageText, []byte(ip.String())); err != nil {
-					log.Println(LOG_TAG, "failed to send IP:", err.Error())
+				ipStr := ip.String()
+				if _, ok := ipSet[ipStr]; !ok {
+					ipSet[ipStr] = struct{}{}
+					if err := ws.Write(ctx, websocket.MessageText, []byte(ip.String())); err != nil {
+						log.Println(LOG_TAG, "failed to send IP:", err.Error())
+					}
 				}
 			}
 		})
