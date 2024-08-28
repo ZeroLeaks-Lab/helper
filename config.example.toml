@@ -1,3 +1,6 @@
+# Connections timeout, in seconds.
+timeout = 10
+
 [Websocket]
 addr = ":443"
 

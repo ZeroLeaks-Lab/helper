@@ -1,12 +1,10 @@
 package main
 
 import (
-	"context"
 	"log"
 	"net"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/jellydator/ttlcache/v3"
 	"github.com/miekg/dns"
@@ -21,23 +19,18 @@ func onRequest(domain string, ip net.IP) {
 	}
 	subdomain := domain[:p-1]
 	if s, err := strconv.ParseUint(subdomain, 10, 32); err == nil {
-		entry, ok := subdomains.GetAndDelete(uint32(s))
-		if ok {
+		entry := subdomains.Get(uint32(s))
+		if entry != nil {
 			entry.Value()(ip)
 		}
 	}
 }
 
 func startDnsServer(addr, domain string) {
-	subdomains = ttlcache.New(ttlcache.WithTTL[uint32, func(net.IP)](30 * time.Second))
-	subdomains.OnEviction(func(ctx context.Context, reason ttlcache.EvictionReason, i *ttlcache.Item[uint32, func(net.IP)]) {
-		if reason != ttlcache.EvictionReasonDeleted {
-			i.Value()(nil)
-		}
-	})
+	subdomains = ttlcache.New(ttlcache.WithTTL[uint32, func(net.IP)](timeout))
 	go subdomains.Start()
 	dns.HandleFunc(domain, func(w dns.ResponseWriter, m *dns.Msg) {
-		onRequest(m.Question[0].Name, w.RemoteAddr().(*net.UDPAddr).IP)
+		onRequest(strings.ToLower(m.Question[0].Name), w.RemoteAddr().(*net.UDPAddr).IP)
 		r := dns.Msg{}
 		r.SetReply(m)
 		r.Rcode = dns.RcodeNameError // avoid being queried again
