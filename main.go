@@ -4,6 +4,7 @@ import (
 	"flag"
 	"log"
 	"time"
+	"zeroleaks/dns"
 
 	"github.com/BurntSushi/toml"
 	"github.com/coder/websocket"
@@ -29,6 +30,7 @@ type Config struct {
 
 var conf Config
 var timeout time.Duration
+var dnsServer dns.DnsServer
 
 func main() {
 	configPath := flag.String("config", "config.toml", "Configuration file path. Defaults to \"config.toml\"")
@@ -44,6 +46,8 @@ func main() {
 		websocketOptions.OriginPatterns = conf.Websocket.Origins
 	}
 
-	go startDnsServer(conf.DNS.Addr, conf.DNS.Domain)
+	d := dns.NewServer(conf.DNS.Domain, timeout)
+	dnsServer = d
+	go d.Start(conf.DNS.Addr)
 	startWebsocketServer(conf.Websocket.Addr, conf.Websocket.TLS, websocketOptions)
 }

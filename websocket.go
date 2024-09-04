@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/binary"
-	"encoding/json"
 	"log"
 	"net"
 	"net/http"
@@ -12,50 +11,47 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+	"github.com/coder/websocket/wsjson"
 )
 
-const LOG_TAG = "Websocket server:"
-const TESTS_NUMBER = 6
+const WS_LOG_TAG = "Websocket server:"
+const DNS_LEAK_TESTS_NUMBER = 6
 
-type DnsLeakTestParams struct {
+type dnsLeakTestParams struct {
 	Base       string   `json:"base"`
 	Subdomains []string `json:"subdomains"`
 }
 
 func dnsLeakTest(ws *websocket.Conn) {
-	random := make([]byte, 4*TESTS_NUMBER)
+	random := make([]byte, 4*DNS_LEAK_TESTS_NUMBER)
 	if _, err := rand.Read(random); err != nil {
-		log.Panicln(LOG_TAG, "failed to read random bytes:", err)
+		log.Panicln(WS_LOG_TAG, "failed to read random bytes:", err)
 	}
 	ctx := context.Background()
 	ws.CloseRead(ctx)
-	params := DnsLeakTestParams{
+	params := dnsLeakTestParams{
 		Base:       conf.DNS.Domain,
-		Subdomains: make([]string, 0, TESTS_NUMBER),
+		Subdomains: make([]string, 0, DNS_LEAK_TESTS_NUMBER),
 	}
 	ipSet := make(map[string]struct{})
 	closed := false
-	for i := 0; i < TESTS_NUMBER; i++ {
+	for i := 0; i < DNS_LEAK_TESTS_NUMBER; i++ {
 		s := binary.LittleEndian.Uint32(random[i : i+4])
 		params.Subdomains = append(params.Subdomains, strconv.FormatUint(uint64(s), 10))
-		registerDnsCallback(s, func(ip net.IP) {
+		dnsServer.RegisterCallback(s, func(ip net.IP) {
 			if !closed {
 				ipStr := ip.String()
 				if _, ok := ipSet[ipStr]; !ok {
 					ipSet[ipStr] = struct{}{}
 					if err := ws.Write(ctx, websocket.MessageText, []byte(ip.String())); err != nil {
-						log.Println(LOG_TAG, "failed to send IP:", err.Error())
+						log.Println(WS_LOG_TAG, "failed to send IP:", err.Error())
 					}
 				}
 			}
 		})
 	}
-	b, err := json.Marshal(params)
-	if err != nil {
-		log.Panicln("Cannot serialize DnsLeakTestParams:", err)
-	}
-	if err := ws.Write(ctx, websocket.MessageText, b); err != nil {
-		log.Println(LOG_TAG, "failed to send subdomain:", err.Error())
+	if err := wsjson.Write(ctx, ws, params); err != nil {
+		log.Println(WS_LOG_TAG, "failed to send subdomain:", err.Error())
 	}
 	go func() {
 		time.Sleep(timeout)
@@ -68,7 +64,7 @@ func startWebsocketServer(addr string, tls TLSConfig, options websocket.AcceptOp
 	http.HandleFunc("/v1/dns", func(w http.ResponseWriter, r *http.Request) {
 		ws, err := websocket.Accept(w, r, &options)
 		if err != nil {
-			log.Println(LOG_TAG, "failed to accept:", err.Error())
+			log.Println(WS_LOG_TAG, "failed to accept:", err.Error())
 			return
 		}
 		dnsLeakTest(ws)
@@ -79,5 +75,5 @@ func startWebsocketServer(addr string, tls TLSConfig, options websocket.AcceptOp
 	} else {
 		err = http.ListenAndServeTLS(addr, tls.Cert, tls.Key, nil)
 	}
-	log.Fatalln(LOG_TAG, "failed to start:", err)
+	log.Fatalln(WS_LOG_TAG, "failed to start:", err)
 }
