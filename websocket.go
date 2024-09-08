@@ -2,13 +2,14 @@ package main
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/binary"
 	"log"
 	"net"
 	"net/http"
 	"strconv"
 	"time"
+	"zeroleaks/bittorrent"
+	"zeroleaks/utils"
 
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
@@ -22,55 +23,81 @@ type dnsLeakTestParams struct {
 	Subdomains []string `json:"subdomains"`
 }
 
-func dnsLeakTest(ws *websocket.Conn) {
-	random := make([]byte, 4*DNS_LEAK_TESTS_NUMBER)
-	if _, err := rand.Read(random); err != nil {
-		log.Panicln(WS_LOG_TAG, "failed to read random bytes:", err)
+func sendIP(ws *websocket.Conn, ctx context.Context, closed *bool) func(net.IP) {
+	ipSet := make(map[string]struct{})
+	return func(ip net.IP) {
+		if !*closed {
+			ipStr := ip.String()
+			if _, ok := ipSet[ipStr]; !ok {
+				ipSet[ipStr] = struct{}{}
+				if err := ws.Write(ctx, websocket.MessageText, []byte(ipStr)); err != nil {
+					log.Println(WS_LOG_TAG, "failed to send IP:", err.Error())
+				}
+			}
+		}
 	}
+}
+
+func waitAndClose(ws *websocket.Conn, timeout time.Duration, closed *bool) {
+	go func() {
+		time.Sleep(timeout)
+		ws.Close(websocket.StatusNormalClosure, "")
+		*closed = true
+	}()
+}
+
+func dnsLeakTest(ws *websocket.Conn) {
+	random := utils.RandomBytes(4 * DNS_LEAK_TESTS_NUMBER)
 	ctx := context.Background()
 	ws.CloseRead(ctx)
 	params := dnsLeakTestParams{
 		Base:       conf.DNS.Domain,
 		Subdomains: make([]string, 0, DNS_LEAK_TESTS_NUMBER),
 	}
-	ipSet := make(map[string]struct{})
 	closed := false
 	for i := 0; i < DNS_LEAK_TESTS_NUMBER; i++ {
 		s := binary.LittleEndian.Uint32(random[i : i+4])
 		params.Subdomains = append(params.Subdomains, strconv.FormatUint(uint64(s), 10))
-		dnsServer.RegisterCallback(s, func(ip net.IP) {
-			if !closed {
-				ipStr := ip.String()
-				if _, ok := ipSet[ipStr]; !ok {
-					ipSet[ipStr] = struct{}{}
-					if err := ws.Write(ctx, websocket.MessageText, []byte(ip.String())); err != nil {
-						log.Println(WS_LOG_TAG, "failed to send IP:", err.Error())
-					}
-				}
-			}
-		})
+		dnsServer.RegisterCallback(s, sendIP(ws, ctx, &closed))
 	}
 	if err := wsjson.Write(ctx, ws, params); err != nil {
-		log.Println(WS_LOG_TAG, "failed to send subdomain:", err.Error())
+		log.Println(WS_LOG_TAG, "failed to send DNS params:", err.Error())
+		ws.CloseNow()
+		return
 	}
-	go func() {
-		time.Sleep(conf.DNS.Timeout)
-		ws.Close(websocket.StatusNormalClosure, "")
-		closed = true
-	}()
+	waitAndClose(ws, conf.DNS.Timeout, &closed)
+}
+
+func bittorrentLeakTest(ws *websocket.Conn) {
+	infoHash := bittorrent.InfoHash(utils.RandomBytes(20))
+	ctx := context.Background()
+	ws.CloseRead(ctx)
+	closed := false
+	bittorrentTracker.RegisterCallback(infoHash, sendIP(ws, ctx, &closed))
+	if err := ws.Write(ctx, websocket.MessageBinary, infoHash[:]); err != nil {
+		log.Println(WS_LOG_TAG, "failed to send info-hash:", err)
+		ws.CloseNow()
+		return
+	}
+	waitAndClose(ws, conf.BitTorrent.Timeout, &closed)
 }
 
 func startWebsocketServer(addr string, tls TLSConfig, options websocket.AcceptOptions) {
-	http.HandleFunc("/v1/dns", func(w http.ResponseWriter, r *http.Request) {
-		ws, err := websocket.Accept(w, r, &options)
-		if err != nil {
-			log.Println(WS_LOG_TAG, "failed to accept:", err.Error())
-			return
+	acceptWebsocket := func(callback func(*websocket.Conn)) func(http.ResponseWriter, *http.Request) {
+		return func(w http.ResponseWriter, r *http.Request) {
+			ws, err := websocket.Accept(w, r, &options)
+			if err != nil {
+				log.Println(WS_LOG_TAG, "failed to accept:", err.Error())
+				return
+			}
+			callback(ws)
 		}
-		dnsLeakTest(ws)
-	})
+	}
+	http.HandleFunc("/v1/dns", acceptWebsocket(dnsLeakTest))
+	http.HandleFunc("/v1/bittorrent", acceptWebsocket(bittorrentLeakTest))
+
 	var err error
-	if conf.Websocket.TLS.Cert == "" && conf.Websocket.TLS.Key == "" {
+	if tls.Cert == "" && tls.Key == "" {
 		err = http.ListenAndServe(addr, nil)
 	} else {
 		err = http.ListenAndServeTLS(addr, tls.Cert, tls.Key, nil)
