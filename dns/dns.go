@@ -11,17 +11,13 @@ import (
 	"github.com/miekg/dns"
 )
 
-type DnsServer interface {
-	RegisterCallback(t uint32, f func(net.IP))
-}
-
-type DnsServerImpl struct {
+type DnsServer struct {
 	topDomain  string
 	subdomains *ttlcache.Cache[uint32, func(net.IP)]
 }
 
-func NewServer(topDomain string, timeout time.Duration) *DnsServerImpl {
-	server := DnsServerImpl{
+func NewServer(topDomain string, timeout time.Duration) *DnsServer {
+	server := DnsServer{
 		topDomain:  topDomain,
 		subdomains: ttlcache.New(ttlcache.WithTTL[uint32, func(net.IP)](timeout)),
 	}
@@ -29,11 +25,11 @@ func NewServer(topDomain string, timeout time.Duration) *DnsServerImpl {
 	return &server
 }
 
-func (s *DnsServerImpl) RegisterCallback(k uint32, f func(net.IP)) {
+func (s *DnsServer) RegisterCallback(k uint32, f func(net.IP)) {
 	s.subdomains.Set(k, f, ttlcache.DefaultTTL)
 }
 
-func (s *DnsServerImpl) onRequest(domain string, ip net.IP) {
+func (s *DnsServer) onRequest(domain string, ip net.IP) {
 	p := strings.Index(domain, s.topDomain)
 	if p < 1 {
 		return
@@ -47,7 +43,7 @@ func (s *DnsServerImpl) onRequest(domain string, ip net.IP) {
 	}
 }
 
-func (s *DnsServerImpl) Start(addr string) {
+func (s *DnsServer) Start(addr string) {
 	dns.HandleFunc(s.topDomain, func(w dns.ResponseWriter, m *dns.Msg) {
 		s.onRequest(strings.ToLower(m.Question[0].Name), w.RemoteAddr().(*net.UDPAddr).IP)
 		r := dns.Msg{}

@@ -21,3 +21,6 @@ addr = ":53"
 
 # Domain under which to create temporary subdomains.
 domain = "dns.zeroleaks.org"
+
+[BitTorrent]
+addr = ":1337"

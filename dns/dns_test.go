@@ -16,7 +16,7 @@ const invalidDomain = "invalid.domain"
 const addr = "127.0.0.1:35353"
 const timeout = time.Millisecond * 100
 
-var server DnsServerImpl
+var server DnsServer
 
 func TestMain(m *testing.M) {
 	server = *NewServer("test", timeout)

@@ -6,6 +6,7 @@ require (
 	github.com/BurntSushi/toml v1.4.0
 	github.com/coder/websocket v1.8.12
 	github.com/jellydator/ttlcache/v3 v3.2.0
+	github.com/lunixbochs/struc v0.0.0-20200707160740-784aaebc1d40
 	github.com/miekg/dns v1.1.62
 )
 

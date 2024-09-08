@@ -3,7 +3,9 @@ package main
 import (
 	"flag"
 	"log"
+	"net"
 	"time"
+	"zeroleaks/bittorrent"
 	"zeroleaks/dns"
 
 	"github.com/BurntSushi/toml"
@@ -26,11 +28,20 @@ type Config struct {
 		Addr   string
 		Domain string
 	}
+	BitTorrent struct {
+		Addr string
+	}
+}
+
+type IPLogger[T any] interface {
+	RegisterCallback(t T, f func(net.IP))
 }
 
 var conf Config
 var timeout time.Duration
-var dnsServer dns.DnsServer
+
+var dnsServer IPLogger[uint32]
+var bittorrentTracker IPLogger[bittorrent.InfoHash]
 
 func main() {
 	configPath := flag.String("config", "config.toml", "Configuration file path. Defaults to \"config.toml\"")
@@ -49,5 +60,11 @@ func main() {
 	d := dns.NewServer(conf.DNS.Domain, timeout)
 	dnsServer = d
 	go d.Start(conf.DNS.Addr)
+	t, err := bittorrent.NewTracker(conf.BitTorrent.Addr, timeout)
+	if err != nil {
+		log.Fatalln("Failed to start BitTorrent tracker:", err)
+	}
+	go t.Start()
+	bittorrentTracker = t
 	startWebsocketServer(conf.Websocket.Addr, conf.Websocket.TLS, websocketOptions)
 }

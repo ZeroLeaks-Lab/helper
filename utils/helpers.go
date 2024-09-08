@@ -4,12 +4,15 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"net"
 )
 
 func RandomBytes(size int) []byte {
 	bytes := make([]byte, size)
-	rand.Read(bytes)
+	if _, err := rand.Read(bytes); err != nil {
+		log.Panicf("Failed to read %d random bytes: %s", size, err)
+	}
 	return bytes
 }
 
