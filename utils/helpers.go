@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"runtime/debug"
+	"testing"
 )
 
 func RandomBytes(size int) []byte {
@@ -33,4 +35,18 @@ func RandomIPv6() net.IP {
 		hex.EncodeToString(bytes[12:14]),
 		hex.EncodeToString(bytes[14:]),
 	))
+}
+
+func LogStack(t *testing.T) {
+	t.Log(string(debug.Stack()))
+}
+
+func TErrorf(t *testing.T, format string, args ...any) {
+	LogStack(t)
+	t.Errorf(format, args...)
+}
+
+func TFatalf(t *testing.T, format string, args ...any) {
+	LogStack(t)
+	t.Fatalf(format, args...)
 }

@@ -38,17 +38,17 @@ func TestMain(m *testing.M) {
 func send(c net.Conn, buff []byte, name string, t *testing.T) {
 	n, err := c.Write(buff)
 	if err != nil {
-		t.Fatalf("Failed to send %s: %s", name, err)
+		utils.TFatalf(t, "Failed to send %s: %s", name, err)
 	}
 	if n != len(buff) {
-		t.Errorf("Incorrect amount of %s bytes sent: sent %d, expected %d", name, n, len(buff))
+		utils.TErrorf(t, "Incorrect amount of %s bytes sent: sent %d, expected %d", name, n, len(buff))
 	}
 }
 
 func connect(t *testing.T) net.Conn {
 	c, err := net.Dial("udp", addr)
 	if err != nil {
-		t.Fatalf("Cannot connect to the tracker: %s", err)
+		utils.TFatalf(t, "Cannot connect to the tracker: %s", err)
 	}
 	return c
 }
@@ -63,7 +63,7 @@ func FuzzRandomPacket(f *testing.F) {
 		}
 		send(c, packet, "random packet", t)
 		if err := c.Close(); err != nil {
-			t.Errorf("Failed to close connection: %s", err)
+			utils.TErrorf(t, "Failed to close connection: %s", err)
 		}
 	})
 }
@@ -76,7 +76,7 @@ func TestTracker(t *testing.T) {
 	})
 	unknownInfoHash := InfoHash(utils.RandomBytes(20))
 	tracker.RegisterCallback(unknownInfoHash, func(ip net.IP) {
-		t.Errorf("Callback for info hash %x unexpectedly called with IP %s", unknownInfoHash, ip)
+		utils.TErrorf(t, "Callback for info hash %x unexpectedly called with IP %s", unknownInfoHash, ip)
 	})
 
 	c := connect(t)
@@ -88,27 +88,27 @@ func TestTracker(t *testing.T) {
 		Action:        ACTION_CONNECT,
 		TransactionId: trId,
 	}); err != nil {
-		t.Fatalf("Failed to pack connect request: %s", err)
+		utils.TFatalf(t, "Failed to pack connect request: %s", err)
 	}
 	send(c, sendBuff.Bytes(), "connect request", t)
 	// receiving connect response
 	recvBuff := make([]byte, max(CONNECT_RESPONSE_SIZE, ANNOUNCE_RESPONSE_SIZE))
 	n, err := c.Read(recvBuff)
 	if err != nil {
-		t.Fatalf("Failed to read connect response: %s", err)
+		utils.TFatalf(t, "Failed to read connect response: %s", err)
 	}
 	if n != CONNECT_RESPONSE_SIZE {
-		t.Errorf("Unexpected connect response size: received %d bytes, expected %d", n, CONNECT_RESPONSE_SIZE)
+		utils.TErrorf(t, "Unexpected connect response size: received %d bytes, expected %d", n, CONNECT_RESPONSE_SIZE)
 	}
 	var connectResponse ConnectResponse
 	if err = struc.Unpack(bytes.NewBuffer(recvBuff), &connectResponse); err != nil {
-		t.Fatalf("Failed to unpack connect response: %s", err)
+		utils.TFatalf(t, "Failed to unpack connect response: %s", err)
 	}
 	if connectResponse.Action != ACTION_CONNECT {
-		t.Errorf("Invalid connect response action: received %x, expected %x", connectResponse.Action, ACTION_CONNECT)
+		utils.TErrorf(t, "Invalid connect response action: received %x, expected %x", connectResponse.Action, ACTION_CONNECT)
 	}
 	if connectResponse.TransactionId != trId {
-		t.Errorf("Incorrect transaction_id received: %d, expected %d", connectResponse.TransactionId, trId)
+		utils.TErrorf(t, "Incorrect transaction_id received: %d, expected %d", connectResponse.TransactionId, trId)
 	}
 	// sending announce request
 	trId = rand.Uint32()
@@ -119,29 +119,29 @@ func TestTracker(t *testing.T) {
 		TransactionId: trId,
 		InfoHash:      infoHash,
 	}); err != nil {
-		t.Fatalf("Failed to pack announce request: %s", err)
+		utils.TFatalf(t, "Failed to pack announce request: %s", err)
 	}
 	send(c, sendBuff.Bytes(), "announce request", t)
 	// receiving announce response
 	n, err = c.Read(recvBuff)
 	if err != nil {
-		t.Fatalf("Failed to read announce response: %s", err)
+		utils.TFatalf(t, "Failed to read announce response: %s", err)
 	}
 	if n != ANNOUNCE_RESPONSE_SIZE {
-		t.Errorf("Unexpected announce response size: received %d bytes, expected %d", n, ANNOUNCE_RESPONSE_SIZE)
+		utils.TErrorf(t, "Unexpected announce response size: received %d bytes, expected %d", n, ANNOUNCE_RESPONSE_SIZE)
 	}
 	var announceResponse AnnounceResponse
 	if err = struc.Unpack(bytes.NewBuffer(recvBuff), &announceResponse); err != nil {
-		t.Fatalf("Failed to unpack announce response: %s", err)
+		utils.TFatalf(t, "Failed to unpack announce response: %s", err)
 	}
 	if announceResponse.Action != ACTION_ANNOUNCE {
-		t.Errorf("Invalid announce response action: received %x, expected %x", announceResponse.Action, ACTION_ANNOUNCE)
+		utils.TErrorf(t, "Invalid announce response action: received %x, expected %x", announceResponse.Action, ACTION_ANNOUNCE)
 	}
 	if announceResponse.TransactionId != trId {
-		t.Errorf("Incorrect transaction_id received: %d, expected %d", announceResponse.TransactionId, trId)
+		utils.TErrorf(t, "Incorrect transaction_id received: %d, expected %d", announceResponse.TransactionId, trId)
 	}
 
 	if !requestIp.Equal(net.IPv4(127, 0, 0, 1)) {
-		t.Errorf("Invalid request IP: %s", requestIp)
+		utils.TErrorf(t, "Invalid request IP: %s", requestIp)
 	}
 }

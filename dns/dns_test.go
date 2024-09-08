@@ -34,7 +34,7 @@ func TestCallback(t *testing.T) {
 	key := rand.Uint32()
 	server.RegisterCallback(key, func(ip net.IP) {
 		if !ip.Equal(expectedIP) {
-			t.Errorf("Callback for subdomain %d called with wrong IP. Got %s, expected %s", key, ip, expectedIP)
+			utils.TErrorf(t, "Callback for subdomain %d called with wrong IP. Got %s, expected %s", key, ip, expectedIP)
 		} else if expectedIP.Equal(ipv4) {
 			expectedIP = ipv6
 		} else {
@@ -46,11 +46,11 @@ func TestCallback(t *testing.T) {
 	domain := fullDomainFromKey(key)
 	server.onRequest(domain, expectedIP)
 	if !expectedIP.Equal(ipv6) {
-		t.Errorf("Callback for subdomain %d not called with IPv4: %s", key, ipv4)
+		utils.TErrorf(t, "Callback for subdomain %d not called with IPv4: %s", key, ipv4)
 	}
 	server.onRequest(domain, expectedIP)
 	if expectedIP != nil {
-		t.Errorf("Callback for subdomain %d not called with IPv6: %s", key, ipv6)
+		utils.TErrorf(t, "Callback for subdomain %d not called with IPv6: %s", key, ipv6)
 	}
 	server.onRequest(domain, expectedIP)
 	server.onRequest(invalidDomain, ipv4) // callback should not be triggered
@@ -59,14 +59,14 @@ func TestCallback(t *testing.T) {
 func TestExpiration(t *testing.T) {
 	key := rand.Uint32()
 	server.RegisterCallback(key, func(ip net.IP) {
-		t.Errorf("Callback for subdomain %d unexpectedly called with IP %s", key, ip)
+		utils.TErrorf(t, "Callback for subdomain %d unexpectedly called with IP %s", key, ip)
 	})
 	if !server.subdomains.Has(key) {
-		t.Errorf("Subdomain %d not registered", key)
+		utils.TErrorf(t, "Subdomain %d not registered", key)
 	}
 	time.Sleep(timeout + 20*time.Millisecond) // add 20ms margin
 	if server.subdomains.Has(key) {
-		t.Errorf("Subdomain %d not expired after %s", key, timeout)
+		utils.TErrorf(t, "Subdomain %d not expired after %s", key, timeout)
 	}
 
 	expectedIP := utils.RandomIPv4()
@@ -74,20 +74,20 @@ func TestExpiration(t *testing.T) {
 	server.RegisterCallback(key, func(ip net.IP) {
 		called = true
 		if !ip.Equal(expectedIP) {
-			t.Errorf("Callback for subdomain %d called with wrong IP. Got %s, expected %s", key, ip, expectedIP)
+			utils.TErrorf(t, "Callback for subdomain %d called with wrong IP. Got %s, expected %s", key, ip, expectedIP)
 		}
 	})
 	time.Sleep(timeout - 20*time.Millisecond)
 	if !server.subdomains.Has(key) {
-		t.Errorf("Subdomain %d expired before timeout", key)
+		utils.TErrorf(t, "Subdomain %d expired before timeout", key)
 	}
 	server.onRequest(fullDomainFromKey(key), expectedIP)
 	time.Sleep(40 * time.Millisecond)
 	if server.subdomains.Has(key) {
-		t.Errorf("Subdomain %d not expired after more than %s passed", key, timeout)
+		utils.TErrorf(t, "Subdomain %d not expired after more than %s passed", key, timeout)
 	}
 	if !called {
-		t.Errorf("Callback not triggered")
+		utils.TErrorf(t, "Callback not triggered")
 	}
 }
 
@@ -96,15 +96,16 @@ func query(t *testing.T, c *dns.Client, domain string, expectedRcode int) {
 	m.SetQuestion(domain, dns.TypeA)
 	r, _, err := c.Exchange(m, addr)
 	if err != nil {
-		t.Fatalf("Client error: %s", err)
+		utils.TFatalf(t, "Client error: %s", err)
 	}
 	if r.Rcode != expectedRcode {
-		t.Errorf("Invalid error code: %d. Expected %d", r.Rcode, expectedRcode)
+		utils.TErrorf(t, "Invalid error code: %d. Expected %d", r.Rcode, expectedRcode)
 	}
 }
 
 func TestDnsServer(t *testing.T) {
 	go server.Start(addr)
+	time.Sleep(20 * time.Millisecond) // wait for the server to start
 	c := new(dns.Client)
 	query(t, c, invalidDomain+".", dns.RcodeRefused)
 	query(t, c, ".", dns.RcodeRefused)
@@ -116,6 +117,6 @@ func TestDnsServer(t *testing.T) {
 	})
 	query(t, c, fullDomainFromKey(key)+".", dns.RcodeNameError)
 	if !requestIp.Equal(net.IPv4(127, 0, 0, 1)) {
-		t.Errorf("Invalid request IP: %s", requestIp)
+		utils.TErrorf(t, "Invalid request IP: %s", requestIp)
 	}
 }
