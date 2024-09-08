@@ -18,6 +18,7 @@ type TLSConfig struct {
 }
 
 type Config struct {
+	Host      string
 	Websocket struct {
 		Addr    string
 		TLS     TLSConfig
@@ -42,6 +43,7 @@ var conf Config
 
 var dnsServer IPLogger[uint32]
 var bittorrentTracker IPLogger[bittorrent.InfoHash]
+var bittorrentTrackerPort int
 
 func main() {
 	configPath := flag.String("config", "config.toml", "Configuration file path. Defaults to \"config.toml\"")
@@ -59,11 +61,12 @@ func main() {
 	d := dns.NewServer(conf.DNS.Domain, conf.DNS.Timeout)
 	dnsServer = d
 	go d.Start(conf.DNS.Addr)
-	t, err := bittorrent.NewTracker(conf.BitTorrent.Addr, conf.BitTorrent.Timeout)
+	t, port, err := bittorrent.NewTracker(conf.BitTorrent.Addr, conf.BitTorrent.Timeout)
 	if err != nil {
 		log.Fatalln("Failed to start BitTorrent tracker:", err)
 	}
 	go t.Start()
 	bittorrentTracker = t
+	bittorrentTrackerPort = port
 	startWebsocketServer(conf.Websocket.Addr, conf.Websocket.TLS, websocketOptions)
 }

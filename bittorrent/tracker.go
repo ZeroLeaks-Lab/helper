@@ -71,17 +71,17 @@ type Tracker struct {
 	infoHashes *ttlcache.Cache[InfoHash, func(net.IP)]
 }
 
-func NewTracker(addr string, timeout time.Duration) (*Tracker, error) {
+func NewTracker(addr string, timeout time.Duration) (*Tracker, int, error) {
 	server, err := net.ListenPacket("udp", addr)
 	if err != nil {
-		return nil, err
+		return nil, -1, err
 	}
 	tracker := Tracker{
 		udpServer:  server,
 		infoHashes: ttlcache.New(ttlcache.WithTTL[InfoHash, func(net.IP)](timeout)),
 	}
 	go tracker.infoHashes.Start()
-	return &tracker, nil
+	return &tracker, server.LocalAddr().(*net.UDPAddr).Port, nil
 }
 
 func (t *Tracker) RegisterCallback(k InfoHash, f func(net.IP)) {

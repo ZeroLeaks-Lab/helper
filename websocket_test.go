@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"encoding/hex"
 	"math/rand"
 	"net"
 	"os"
+	"regexp"
 	"strconv"
 	"testing"
 	"time"
@@ -132,13 +134,21 @@ func TestDnsLeak(t *testing.T) {
 
 func TestBittorrentLeak(t *testing.T) {
 	conf.BitTorrent.Timeout = timeout
+	conf.Host = "test"
+	bittorrentTrackerPort = 1337
 	bittorrentTracker = &MockLogger[bittorrent.InfoHash]{
 		callbacks: make(map[bittorrent.InfoHash]func(net.IP)),
 	}
 	ws := wsConnect("bittorrent", t)
-	infoHash := ws.readBinary(t)
-	if len(infoHash) != 20 {
-		utils.TFatalf(t, "Invalid %d bytes long info hash received: %s", len(infoHash), infoHash)
+	magnetLink := ws.readString(t)
+	re := regexp.MustCompile(`^magnet:\?xt=urn:btih:([0-9a-f]{40})&tr=udp://test:1337$`)
+	if !re.MatchString(magnetLink) {
+		utils.TFatalf(t, "Invalid magnet link received: %s", magnetLink)
+	}
+	matches := re.FindStringSubmatch(magnetLink)
+	infoHash, err := hex.DecodeString(matches[1])
+	if err != nil {
+		utils.TFatalf(t, "Failed to decode info hash %s: %s", matches[1], err)
 	}
 	ip1 := utils.RandomIPv4()
 	ip2 := utils.RandomIPv4()

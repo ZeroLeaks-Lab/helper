@@ -19,7 +19,7 @@ const timeout = time.Millisecond * 100
 var tracker *Tracker
 
 func TestMain(m *testing.M) {
-	t, err := NewTracker(addr, timeout)
+	t, _, err := NewTracker(addr, timeout)
 	// Fuzzing spawns several processes in parallel. Consequently,
 	// the tracker server will not be able to listen to on the same UDP port
 	// if another process has already bound to it earlier. In the case of an

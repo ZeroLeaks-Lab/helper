@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/binary"
+	"encoding/hex"
 	"log"
 	"net"
 	"net/http"
@@ -74,8 +75,9 @@ func bittorrentLeakTest(ws *websocket.Conn) {
 	ws.CloseRead(ctx)
 	closed := false
 	bittorrentTracker.RegisterCallback(infoHash, sendIP(ws, ctx, &closed))
-	if err := ws.Write(ctx, websocket.MessageBinary, infoHash[:]); err != nil {
-		log.Println(WS_LOG_TAG, "failed to send info-hash:", err)
+	magnetLink := "magnet:?xt=urn:btih:" + hex.EncodeToString(infoHash[:]) + "&tr=udp://" + conf.Host + ":" + strconv.FormatInt(int64(bittorrentTrackerPort), 10)
+	if err := ws.Write(ctx, websocket.MessageText, []byte(magnetLink)); err != nil {
+		log.Println(WS_LOG_TAG, "failed to send magnet link:", err)
 		ws.CloseNow()
 		return
 	}
