@@ -56,10 +56,11 @@ func dnsLeakTest(ws *websocket.Conn) {
 		Subdomains: make([]string, 0, DNS_LEAK_TESTS_NUMBER),
 	}
 	closed := false
+	callback := sendIP(ws, ctx, &closed)
 	for i := 0; i < DNS_LEAK_TESTS_NUMBER; i++ {
 		s := binary.LittleEndian.Uint32(random[i : i+4])
 		params.Subdomains = append(params.Subdomains, strconv.FormatUint(uint64(s), 10))
-		dnsServer.RegisterCallback(s, sendIP(ws, ctx, &closed))
+		dnsServer.RegisterCallback(s, callback)
 	}
 	if err := wsjson.Write(ctx, ws, params); err != nil {
 		log.Println(WS_LOG_TAG, "failed to send DNS params:", err.Error())

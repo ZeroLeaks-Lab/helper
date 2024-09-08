@@ -109,26 +109,29 @@ func TestDnsLeak(t *testing.T) {
 	if len(params.Subdomains) != DNS_LEAK_TESTS_NUMBER {
 		utils.TErrorf(t, "Incorrect number of subdomains received. Got %d, expected %d", len(params.Subdomains), DNS_LEAK_TESTS_NUMBER)
 	}
-	ips := make([]net.IP, DNS_LEAK_TESTS_NUMBER)
-	for i := range ips {
-		if rand.Intn(2) == 0 {
-			ips[i] = utils.RandomIPv4()
-		} else {
-			ips[i] = utils.RandomIPv6()
-		}
-	}
+	ip1 := utils.RandomIPv4()
+	ip2 := utils.RandomIPv4()
+	ip3 := utils.RandomIPv4()
+	ip4 := utils.RandomIPv6()
+	ip5 := utils.RandomIPv4()
+	ip6 := utils.RandomIPv6()
+	ips := []net.IP{ip1, ip1, ip2, ip3, ip1, ip4, ip5, ip6, ip1, ip3, ip6}
 	go func() {
-		for i, s := range params.Subdomains {
+		for _, ip := range ips {
+			s := params.Subdomains[rand.Intn(len(params.Subdomains))]
 			k, err := strconv.ParseUint(s, 10, 32)
 			if err != nil {
 				utils.TErrorf(t, "Invalid subdomain received: %s", s)
 			}
-			dnsServer.(*MockLogger[uint32]).callbacks[uint32(k)](ips[i])
+			dnsServer.(*MockLogger[uint32]).callbacks[uint32(k)](ip)
 		}
 	}()
-	for _, ip := range ips {
-		ws.readAssertEqualsIP(ip, t)
-	}
+	ws.readAssertEqualsIP(ip1, t)
+	ws.readAssertEqualsIP(ip2, t)
+	ws.readAssertEqualsIP(ip3, t)
+	ws.readAssertEqualsIP(ip4, t)
+	ws.readAssertEqualsIP(ip5, t)
+	ws.readAssertEqualsIP(ip6, t)
 	ws.assertEnd(conf.DNS.Timeout, t)
 }
 
@@ -153,12 +156,7 @@ func TestBittorrentLeak(t *testing.T) {
 	ip1 := utils.RandomIPv4()
 	ip2 := utils.RandomIPv4()
 	ip3 := utils.RandomIPv4()
-	ips := make([]net.IP, 0, 5)
-	ips = append(ips, ip1)
-	ips = append(ips, ip2)
-	ips = append(ips, ip2)
-	ips = append(ips, ip1)
-	ips = append(ips, ip3)
+	ips := []net.IP{ip1, ip2, ip2, ip1, ip3}
 	go func() {
 		for _, ip := range ips {
 			bittorrentTracker.(*MockLogger[bittorrent.InfoHash]).callbacks[bittorrent.InfoHash(infoHash)](ip)
