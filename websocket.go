@@ -54,7 +54,7 @@ func dnsLeakTest(ws *websocket.Conn) {
 		log.Println(WS_LOG_TAG, "failed to send subdomain:", err.Error())
 	}
 	go func() {
-		time.Sleep(timeout)
+		time.Sleep(conf.DNS.Timeout)
 		ws.Close(websocket.StatusNormalClosure, "")
 		closed = true
 	}()

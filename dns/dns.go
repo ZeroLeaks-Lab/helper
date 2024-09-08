@@ -18,8 +18,11 @@ type DnsServer struct {
 
 func NewServer(topDomain string, timeout time.Duration) *DnsServer {
 	server := DnsServer{
-		topDomain:  topDomain,
-		subdomains: ttlcache.New(ttlcache.WithTTL[uint32, func(net.IP)](timeout)),
+		topDomain: topDomain,
+		subdomains: ttlcache.New(
+			ttlcache.WithTTL[uint32, func(net.IP)](timeout),
+			ttlcache.WithDisableTouchOnHit[uint32, func(net.IP)](),
+		),
 	}
 	go server.subdomains.Start()
 	return &server

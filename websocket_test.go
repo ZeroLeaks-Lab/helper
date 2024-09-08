@@ -24,7 +24,7 @@ func (s *MockDnsServer) RegisterCallback(k uint32, f func(net.IP)) {
 func TestDnsLeak(t *testing.T) {
 	const addr = "127.0.0.1:38080"
 	conf.DNS.Domain = "test"
-	timeout = time.Millisecond * 100
+	conf.DNS.Timeout = 100 * time.Millisecond
 	dnsServer = &MockDnsServer{
 		subdomains: make(map[uint32]func(net.IP)),
 	}
@@ -76,7 +76,7 @@ func TestDnsLeak(t *testing.T) {
 			}
 		}
 	}
-	time.Sleep(2 * timeout) // wait for server to close connection
+	time.Sleep(2 * conf.DNS.Timeout) // wait for server to close connection
 	_, msg, err := ws.Read(ctx)
 	if err == nil {
 		t.Fatalf("Unexpected message received: %s", msg)

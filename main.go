@@ -18,18 +18,19 @@ type TLSConfig struct {
 }
 
 type Config struct {
-	Timeout   uint32
 	Websocket struct {
 		Addr    string
 		TLS     TLSConfig
 		Origins []string
 	}
 	DNS struct {
-		Addr   string
-		Domain string
+		Addr    string
+		Domain  string
+		Timeout time.Duration
 	}
 	BitTorrent struct {
-		Addr string
+		Addr    string
+		Timeout time.Duration
 	}
 }
 
@@ -38,7 +39,6 @@ type IPLogger[T any] interface {
 }
 
 var conf Config
-var timeout time.Duration
 
 var dnsServer IPLogger[uint32]
 var bittorrentTracker IPLogger[bittorrent.InfoHash]
@@ -49,7 +49,6 @@ func main() {
 	if _, err := toml.DecodeFile(*configPath, &conf); err != nil {
 		log.Fatalln("Failed to parse config file:", err)
 	}
-	timeout = time.Duration(conf.Timeout) * time.Second
 	websocketOptions := websocket.AcceptOptions{}
 	if len(conf.Websocket.Origins) == 0 {
 		websocketOptions.InsecureSkipVerify = true
@@ -57,10 +56,10 @@ func main() {
 		websocketOptions.OriginPatterns = conf.Websocket.Origins
 	}
 
-	d := dns.NewServer(conf.DNS.Domain, timeout)
+	d := dns.NewServer(conf.DNS.Domain, conf.DNS.Timeout)
 	dnsServer = d
 	go d.Start(conf.DNS.Addr)
-	t, err := bittorrent.NewTracker(conf.BitTorrent.Addr, timeout)
+	t, err := bittorrent.NewTracker(conf.BitTorrent.Addr, conf.BitTorrent.Timeout)
 	if err != nil {
 		log.Fatalln("Failed to start BitTorrent tracker:", err)
 	}

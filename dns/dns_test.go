@@ -70,20 +70,24 @@ func TestExpiration(t *testing.T) {
 	}
 
 	expectedIP := utils.RandomIPv4()
+	called := false
 	server.RegisterCallback(key, func(ip net.IP) {
+		called = true
 		if !ip.Equal(expectedIP) {
 			t.Errorf("Callback for subdomain %d called with wrong IP. Got %s, expected %s", key, ip, expectedIP)
 		}
 	})
 	time.Sleep(timeout - 20*time.Millisecond)
-	server.onRequest(fullDomainFromKey(key), expectedIP)
-	time.Sleep(timeout - 20*time.Millisecond)
 	if !server.subdomains.Has(key) {
-		t.Errorf("Subdomain %d expired although being requested within the timeout", key)
+		t.Errorf("Subdomain %d expired before timeout", key)
 	}
+	server.onRequest(fullDomainFromKey(key), expectedIP)
 	time.Sleep(40 * time.Millisecond)
 	if server.subdomains.Has(key) {
-		t.Errorf("Subdomain %d not expired after more than %s passed since last call", key, timeout)
+		t.Errorf("Subdomain %d not expired after more than %s passed", key, timeout)
+	}
+	if !called {
+		t.Errorf("Callback not triggered")
 	}
 }
 
