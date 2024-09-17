@@ -24,27 +24,48 @@ type dnsLeakTestParams struct {
 	Subdomains []string `json:"subdomains"`
 }
 
-func sendIP(ws *websocket.Conn, ctx context.Context, closed *bool) func(net.IP) {
+type IPSender struct {
+	ws       *websocket.Conn
+	ctx      context.Context
+	timeout  time.Duration
+	ch       chan net.IP
+	Callback func(net.IP)
+}
+
+func NewIPSender(ws *websocket.Conn, ctx context.Context, timeout time.Duration) *IPSender {
+	ch := make(chan net.IP)
+	return &IPSender{
+		ws:      ws,
+		ctx:     ctx,
+		timeout: timeout,
+		ch:      ch,
+		Callback: func(ip net.IP) {
+			ch <- ip
+		},
+	}
+}
+
+func (s *IPSender) Start() {
+	go func() {
+		time.Sleep(s.timeout)
+		s.ch <- nil
+	}()
 	ipSet := make(map[string]struct{})
-	return func(ip net.IP) {
-		if !*closed {
+	for {
+		ip := <-s.ch
+		if ip == nil { // timeout
+			s.ws.Close(websocket.StatusNormalClosure, "")
+			break
+		} else {
 			ipStr := ip.String()
 			if _, ok := ipSet[ipStr]; !ok {
 				ipSet[ipStr] = struct{}{}
-				if err := ws.Write(ctx, websocket.MessageText, []byte(ipStr)); err != nil {
+				if err := s.ws.Write(s.ctx, websocket.MessageText, []byte(ipStr)); err != nil {
 					log.Println(WS_LOG_TAG, "failed to send IP:", err.Error())
 				}
 			}
 		}
 	}
-}
-
-func waitAndClose(ws *websocket.Conn, timeout time.Duration, closed *bool) {
-	go func() {
-		time.Sleep(timeout)
-		ws.Close(websocket.StatusNormalClosure, "")
-		*closed = true
-	}()
 }
 
 func dnsLeakTest(ws *websocket.Conn) {
@@ -55,34 +76,33 @@ func dnsLeakTest(ws *websocket.Conn) {
 		Base:       conf.DNS.Domain,
 		Subdomains: make([]string, 0, DNS_LEAK_TESTS_NUMBER),
 	}
-	closed := false
-	callback := sendIP(ws, ctx, &closed)
+	ipSender := NewIPSender(ws, ctx, conf.DNS.Timeout)
 	for i := 0; i < DNS_LEAK_TESTS_NUMBER; i++ {
 		s := binary.LittleEndian.Uint32(random[i : i+4])
 		params.Subdomains = append(params.Subdomains, strconv.FormatUint(uint64(s), 10))
-		dnsServer.RegisterCallback(s, callback)
+		dnsServer.RegisterCallback(s, ipSender.Callback)
 	}
 	if err := wsjson.Write(ctx, ws, params); err != nil {
 		log.Println(WS_LOG_TAG, "failed to send DNS params:", err.Error())
 		ws.CloseNow()
 		return
 	}
-	waitAndClose(ws, conf.DNS.Timeout, &closed)
+	go ipSender.Start()
 }
 
 func bittorrentLeakTest(ws *websocket.Conn) {
 	infoHash := bittorrent.InfoHash(utils.RandomBytes(20))
 	ctx := context.Background()
 	ws.CloseRead(ctx)
-	closed := false
-	bittorrentTracker.RegisterCallback(infoHash, sendIP(ws, ctx, &closed))
+	ipSender := NewIPSender(ws, ctx, conf.BitTorrent.Timeout)
+	bittorrentTracker.RegisterCallback(infoHash, ipSender.Callback)
 	magnetLink := "magnet:?xt=urn:btih:" + hex.EncodeToString(infoHash[:]) + "&tr=udp://" + conf.Host + ":" + strconv.FormatInt(int64(bittorrentTrackerPort), 10)
 	if err := ws.Write(ctx, websocket.MessageText, []byte(magnetLink)); err != nil {
 		log.Println(WS_LOG_TAG, "failed to send magnet link:", err)
 		ws.CloseNow()
 		return
 	}
-	waitAndClose(ws, conf.BitTorrent.Timeout, &closed)
+	go ipSender.Start()
 }
 
 func startWebsocketServer(addr string, tls TLSConfig, options websocket.AcceptOptions) {
