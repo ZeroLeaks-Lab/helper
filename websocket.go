@@ -33,14 +33,18 @@ type IPSender struct {
 }
 
 func NewIPSender(ws *websocket.Conn, ctx context.Context, timeout time.Duration) *IPSender {
-	ch := make(chan net.IP)
+	ch := make(chan net.IP, 32)
 	return &IPSender{
 		ws:      ws,
 		ctx:     ctx,
 		timeout: timeout,
 		ch:      ch,
 		Callback: func(ip net.IP) {
-			ch <- ip
+			select {
+			case ch <- ip:
+			default:
+				// websocket connection closed
+			}
 		},
 	}
 }

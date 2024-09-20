@@ -77,8 +77,11 @@ func NewTracker(addr string, timeout time.Duration) (*Tracker, int, error) {
 		return nil, -1, err
 	}
 	tracker := Tracker{
-		udpServer:  server,
-		infoHashes: ttlcache.New(ttlcache.WithTTL[InfoHash, func(net.IP)](timeout)),
+		udpServer: server,
+		infoHashes: ttlcache.New(
+			ttlcache.WithTTL[InfoHash, func(net.IP)](timeout),
+			ttlcache.WithDisableTouchOnHit[InfoHash, func(net.IP)](),
+		),
 	}
 	go tracker.infoHashes.Start()
 	return &tracker, server.LocalAddr().(*net.UDPAddr).Port, nil
