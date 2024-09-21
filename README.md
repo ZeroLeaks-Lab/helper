@@ -1,20 +1,23 @@
 # ZeroLeaks Helper
 
-Websocket server required for DNS and Bittorrent leak tests.
+Websocket server required for DNS and BitTorrent leak tests.
 
-## Build
+## Installation guide
+
+Download `zeroleaks-x86_64.deb` from the releases page, and install it:
 
 ```
-$ git clone --depth=1 https://github.com/ZeroLeaks-Lab/helper
-$ cd helper
-$ go build
+$ wget https://github.com/ZeroLeaks-Lab/helper/releases/latest/download/zeroleaks-x86_64.deb
+$ sudo dpkg -i zeroleaks-x86_64.deb
 ```
 
-## Setup
+### Configuration
 
-Copy `config.example.toml` to `config.toml` and edit as needed.
+Rename `/etc/zeroleaks/config.example.toml` to `config.toml` and edit as needed.
 
-The `DNS.domain` field must be set to a domain containing a NS record pointing to the zeroleaks helper host. This can be a subdomain of it.
+`addr` parameters can be specified as `IPv4:PORT`, `[IPv6]:PORT`, or just `:PORT` to listen on all addresses.
+
+The `DNS.domain` field must be set to a domain containing a NS record pointing to the ZeroLeaks helper host. This can be a subdomain of it.
 
 For example, if the zeroleaks helper is hosted at zeroleaks.org, `DNS.domain` can be set to dns.zeroleaks.org, and you would add a record like:
 
@@ -22,7 +25,9 @@ For example, if the zeroleaks helper is hosted at zeroleaks.org, `DNS.domain` ca
 dns.zeroleaks.org.  3600    IN  NS  zeroleaks.org.
 ```
 
-If you want to run the websocket server behind a TLS reverse proxy, remove the `Websocket.TLS` fields and configure your reverse proxy to forward plain HTTP to it. Here is an example nginx configuration snippet to expose the websocket server under the `/helper` path:
+If you want the websocket server to handle TLS by itself, just specify the paths to your TLS certificate and key in `Websocket.TLS`, and you're good to go.
+
+If instead you want to run the websocket server behind a TLS reverse proxy, remove the `Websocket.TLS` fields and configure your reverse proxy to forward plain HTTP to it. Here is an example nginx configuration snippet to expose the websocket server under the `/helper` path:
 
 ```nginx
 location /helper {
@@ -34,10 +39,20 @@ location /helper {
 }
 ```
 
-Then `/helper` needs to be added at the end of the `HELPER_SERVER_URL` field from the web `Config.php`.
+Then `/helper` needs to be added at the end of the `HELPER_SERVER_URL` field from the zeroleaks-web's `Config.php`.
 
-## Run
+### Run
 
 ```
-$ ./zeroleaks -config <CONFIG PATH>
+$ sudo systemctl start zeroleaks
+```
+
+## Build from source
+
+Instead of downloading the `.deb` package, you can also build the binary from source by yourself with:
+
+```
+$ git clone --depth=1 https://github.com/ZeroLeaks-Lab/helper.git
+$ cd helper
+$ go build
 ```

@@ -3,6 +3,7 @@
 host = "zeroleaks.org"
 
 [Websocket]
+# Address on which the websocket server listens.
 addr = ":443"
 
 # Origins allowed to use the websocket server.
@@ -11,13 +12,15 @@ origins = [
   "zeroleaks.org",
 ]
 
-# Optional. If not set, the server will listen for plain
-# unencrypted websocket connections.
+# Optional TLS configuration. If not set, the server will
+# listen for plain unencrypted websocket connections.
 [Websocket.TLS]
 cert = "zeroleaks.crt"
 key = "zeroleaks.key"
 
 [DNS]
+# Address on which the DNS server listens.
+# Must be publicly reachable on port 53.
 addr = ":53"
 
 # Session expiration timeout.
@@ -27,6 +30,7 @@ timeout = "10s"
 domain = "dns.zeroleaks.org"
 
 [BitTorrent]
+# Address on which the BitTorrent tracker listens.
 addr = ":1337"
 
 # Session expiration timeout.
