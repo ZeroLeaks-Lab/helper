@@ -1,0 +1,10 @@
+[Unit]
+Description=ZeroLeaks Helper required for DNS and Bittorrent leak tests
+After=network.target
+
+[Service]
+Restart=on-failure
+ExecStart=/usr/bin/zeroleaks -config /etc/zeroleaks/config.toml
+
+[Install]
+WantedBy=multi-user.target

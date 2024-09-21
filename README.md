@@ -56,3 +56,9 @@ $ git clone --depth=1 https://github.com/ZeroLeaks-Lab/helper.git
 $ cd helper
 $ go build
 ```
+
+Then, to build the `.deb` package:
+
+```
+$ ./packaging/package.sh
+```

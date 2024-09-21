@@ -1,0 +1,7 @@
+Package: zeroleaks
+Version: 0.0.1
+Depends: libc6 (>= 2.34)
+Homepage: https://github.com/ZeroLeaks-Lab/helper
+Maintainer: Cipherd <cipherd@arkensys.dedyn.io>
+Architecture: amd64
+Description: ZeroLeaks Helper required for DNS and Bittorrent leak tests

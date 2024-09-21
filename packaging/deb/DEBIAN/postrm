@@ -1,0 +1,13 @@
+#!/bin/sh
+
+set -eu
+
+if [ "$1" = purge ]; then
+	rm -f /etc/zeroleaks/config.toml
+fi
+
+if [ "$1" = remove ] && [ -d /run/systemd/system ] ; then
+	systemctl --system daemon-reload >/dev/null || true
+elif [ "$1" = "purge" ]; then
+	deb-systemd-helper purge 'zeroleaks-helper.service' >/dev/null || true
+fi
