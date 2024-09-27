@@ -28,6 +28,8 @@ const (
 	ACTION_SCRAPE   = 2
 )
 
+var RESEND_CONNECT_RESPONSE_DELAY = 500
+
 type InfoHash [20]byte
 
 type ConnectRequest struct {
@@ -68,6 +70,7 @@ type AnnounceResponse struct {
 
 type Tracker struct {
 	udpServer  net.PacketConn
+	responses  map[uint64]chan bool
 	infoHashes *ttlcache.Cache[InfoHash, func(net.IP)]
 }
 
@@ -78,6 +81,7 @@ func NewTracker(addr string, timeout time.Duration) (*Tracker, int, error) {
 	}
 	tracker := Tracker{
 		udpServer: server,
+		responses: make(map[uint64]chan bool),
 		infoHashes: ttlcache.New(
 			ttlcache.WithTTL[InfoHash, func(net.IP)](timeout),
 			ttlcache.WithDisableTouchOnHit[InfoHash, func(net.IP)](),
@@ -125,7 +129,23 @@ func (t *Tracker) handleConnect(src net.Addr, buff []byte) {
 		TransactionId: connectRequest.TransactionId,
 		ConnectionId:  connectionId,
 	}
-	t.reply(src, &connectResponse, CONNECT_RESPONSE_SIZE)
+	ch := make(chan bool)
+	t.responses[connectionId] = ch
+	go func() {
+		for range 60 {
+			t.reply(src, &connectResponse, CONNECT_RESPONSE_SIZE)
+			time.Sleep(time.Millisecond * time.Duration(RESEND_CONNECT_RESPONSE_DELAY))
+			stop := false
+			select {
+			case _ = <-ch:
+				stop = true
+			default:
+			}
+			if stop {
+				break
+			}
+		}
+	}()
 }
 
 func (t *Tracker) handleAnnounce(src net.Addr, buff []byte) {
@@ -138,6 +158,10 @@ func (t *Tracker) handleAnnounce(src net.Addr, buff []byte) {
 	if err != nil {
 		log.Printf("%s Error: failed to unpack announce request from %s: %s", TRACKER_LOG_TAG, src, err)
 		return
+	}
+	if ch, ok := t.responses[announceRequest.ConnectionId]; ok {
+		ch <- true
+		delete(t.responses, announceRequest.ConnectionId)
 	}
 	entry := t.infoHashes.Get(announceRequest.InfoHash)
 	if entry != nil {

@@ -19,6 +19,7 @@ const timeout = time.Millisecond * 100
 var tracker *Tracker
 
 func TestMain(m *testing.M) {
+	RESEND_CONNECT_RESPONSE_DELAY = 10
 	t, _, err := NewTracker(addr, timeout)
 	// Fuzzing spawns several processes in parallel. Consequently,
 	// the tracker server will not be able to listen to on the same UDP port
@@ -93,15 +94,17 @@ func TestTracker(t *testing.T) {
 	send(c, sendBuff.Bytes(), "connect request", t)
 	// receiving connect response
 	recvBuff := make([]byte, max(CONNECT_RESPONSE_SIZE, ANNOUNCE_RESPONSE_SIZE))
-	n, err := c.Read(recvBuff)
-	if err != nil {
-		utils.TFatalf(t, "Failed to read connect response: %s", err)
-	}
-	if n != CONNECT_RESPONSE_SIZE {
-		utils.TErrorf(t, "Unexpected connect response size: received %d bytes, expected %d", n, CONNECT_RESPONSE_SIZE)
+	for range 6 { // simulate 5 packets drop
+		n, err := c.Read(recvBuff)
+		if err != nil {
+			utils.TFatalf(t, "Failed to read connect response: %s", err)
+		}
+		if n != CONNECT_RESPONSE_SIZE {
+			utils.TErrorf(t, "Unexpected connect response size: received %d bytes, expected %d", n, CONNECT_RESPONSE_SIZE)
+		}
 	}
 	var connectResponse ConnectResponse
-	if err = struc.Unpack(bytes.NewBuffer(recvBuff), &connectResponse); err != nil {
+	if err := struc.Unpack(bytes.NewBuffer(recvBuff), &connectResponse); err != nil {
 		utils.TFatalf(t, "Failed to unpack connect response: %s", err)
 	}
 	if connectResponse.Action != ACTION_CONNECT {
@@ -113,7 +116,7 @@ func TestTracker(t *testing.T) {
 	// sending announce request
 	trId = rand.Uint32()
 	sendBuff.Reset()
-	if err = struc.Pack(sendBuff, &AnnounceRequest{
+	if err := struc.Pack(sendBuff, &AnnounceRequest{
 		ConnectionId:  connectResponse.ConnectionId,
 		Action:        ACTION_ANNOUNCE,
 		TransactionId: trId,
@@ -123,7 +126,7 @@ func TestTracker(t *testing.T) {
 	}
 	send(c, sendBuff.Bytes(), "announce request", t)
 	// receiving announce response
-	n, err = c.Read(recvBuff)
+	n, err := c.Read(recvBuff)
 	if err != nil {
 		utils.TFatalf(t, "Failed to read announce response: %s", err)
 	}
