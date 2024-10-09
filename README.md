@@ -44,7 +44,7 @@ Then `/helper` needs to be added at the end of the `HELPER_SERVER_URL` field fro
 ### Run
 
 ```
-$ sudo systemctl start zeroleaks
+$ sudo systemctl start zeroleaks-helper
 ```
 
 ## Build from source
